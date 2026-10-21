@@ -162,12 +162,6 @@ fun PantallaInicio(
             }
         }
 
-        // Aviso
-        Text(
-            text = "Aplicación académica (MVP) inspirada en el caso de CORPALIV / Alba Lab. " +
-                    "Todos los datos son ficticios.",
-            style = MaterialTheme.typography.bodySmall
-        )
     }
 }
 
