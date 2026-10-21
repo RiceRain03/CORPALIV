@@ -8,20 +8,23 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.corpaliv.data.local.AppDatabase
+import com.example.corpaliv.data.local.SesionDataStore
 import com.example.corpaliv.data.local.UsuarioEntity
 import com.example.corpaliv.data.local.seguridad.ClaveSegura
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class CuentaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getDatabase(application).usuarioDao()
+    private val sesion = SesionDataStore(application)   // NUEVO (2E)
+
 
     var esRegistro by mutableStateOf(false)
         private set
 
-    // Campos del formulario
     var nombre by mutableStateOf("")
     var correo by mutableStateOf("")
     var clave by mutableStateOf("")
@@ -36,8 +39,26 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
     var cargando by mutableStateOf(false)
         private set
 
+    var restaurando by mutableStateOf(true)
+        private set
+
     var usuarioActual by mutableStateOf<UsuarioEntity?>(null)
         private set
+
+    init {
+        restaurarSesion()
+    }
+
+    private fun restaurarSesion() {
+        viewModelScope.launch {
+            val correoGuardado = sesion.correoActual.first()
+            if (correoGuardado != null) {
+                usuarioActual = dao.buscarPorCorreo(correoGuardado)
+                if (usuarioActual == null) sesion.cerrarSesion()
+            }
+            restaurando = false
+        }
+    }
 
     fun cambiarModo(registro: Boolean) {
         esRegistro = registro
@@ -70,6 +91,7 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             usuarioActual = dao.buscarPorCorreo(correoLimpio)
+            sesion.guardarSesion(correoLimpio)
             limpiarCampos()
             cargando = false
         }
@@ -88,6 +110,7 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
 
             if (claveCorrecta) {
                 usuarioActual = usuario
+                sesion.guardarSesion(usuario!!.correo)
                 limpiarCampos()
             } else {
                 errorGeneral = "Correo o clave incorrectos"
@@ -99,6 +122,7 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
     fun cerrarSesion() {
         usuarioActual = null
         limpiarCampos()
+        viewModelScope.launch { sesion.cerrarSesion() }
     }
 
 
@@ -149,12 +173,10 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
                 errorCorreo = "El correo es obligatorio"
                 false
             }
-
             !Patterns.EMAIL_ADDRESS.matcher(correo.trim()).matches() -> {
                 errorCorreo = "Ingresa un correo válido"
                 false
             }
-
             else -> true
         }
     }

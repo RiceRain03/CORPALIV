@@ -49,7 +49,9 @@ fun PantallaCuenta(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (usuario != null) {
+        if (viewModel.restaurando) {
+            CircularProgressIndicator()
+        } else if (usuario != null) {
             SesionIniciada(
                 nombre = usuario.nombre,
                 correo = usuario.correo,
@@ -73,7 +75,6 @@ private fun FormularioCuenta(viewModel: CuentaViewModel) {
         style = MaterialTheme.typography.bodySmall
     )
 
-    // El campo Nombre solo aparece al registrarse, con animación
     AnimatedVisibility(
         visible = viewModel.esRegistro,
         enter = fadeIn() + expandVertically(),
@@ -116,7 +117,6 @@ private fun FormularioCuenta(viewModel: CuentaViewModel) {
         modifier = Modifier.fillMaxWidth()
     )
 
-    // Confirmar clave: solo al registrarse
     AnimatedVisibility(
         visible = viewModel.esRegistro,
         enter = fadeIn() + expandVertically(),
@@ -136,7 +136,6 @@ private fun FormularioCuenta(viewModel: CuentaViewModel) {
         )
     }
 
-    // Error general (por ejemplo, "Correo o clave incorrectos")
     AnimatedVisibility(visible = viewModel.errorGeneral != null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
