@@ -1,6 +1,7 @@
 package com.example.corpaliv.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import android.util.Patterns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.corpaliv.data.local.AppDatabase
+import com.example.corpaliv.data.local.FotoPerfil
 import com.example.corpaliv.data.local.SesionDataStore
 import com.example.corpaliv.data.local.UsuarioEntity
 import com.example.corpaliv.data.local.seguridad.ClaveSegura
@@ -19,8 +21,7 @@ import kotlinx.coroutines.withContext
 class CuentaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getDatabase(application).usuarioDao()
-    private val sesion = SesionDataStore(application)   // NUEVO (2E)
-
+    private val sesion = SesionDataStore(application)
 
     var esRegistro by mutableStateOf(false)
         private set
@@ -29,6 +30,7 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
     var correo by mutableStateOf("")
     var clave by mutableStateOf("")
     var confirmarClave by mutableStateOf("")
+
 
     var errorNombre by mutableStateOf<String?>(null)
     var errorCorreo by mutableStateOf<String?>(null)
@@ -123,6 +125,26 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
         usuarioActual = null
         limpiarCampos()
         viewModelScope.launch { sesion.cerrarSesion() }
+    }
+
+
+    fun actualizarFoto(nuevaRuta: String) {
+        val usuario = usuarioActual ?: return
+        viewModelScope.launch {
+            dao.actualizarFoto(usuario.id, nuevaRuta)
+            FotoPerfil.borrar(usuario.fotoRuta)
+            usuarioActual = usuario.copy(fotoRuta = nuevaRuta)
+        }
+    }
+
+    fun guardarFotoDesdeGaleria(uri: Uri) {
+        val usuario = usuarioActual ?: return
+        viewModelScope.launch {
+            val archivo = withContext(Dispatchers.IO) {
+                FotoPerfil.copiarDesdeUri(getApplication<Application>(), uri, usuario.id)
+            }
+            if (archivo != null) actualizarFoto(archivo.absolutePath)
+        }
     }
 
 
