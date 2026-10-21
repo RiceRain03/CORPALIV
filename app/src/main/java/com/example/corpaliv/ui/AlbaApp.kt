@@ -30,12 +30,7 @@ import com.example.corpaliv.ui.screens.PantallaCatalogo
 import com.example.corpaliv.ui.screens.PantallaContacto
 import com.example.corpaliv.ui.screens.PantallaCuenta
 import com.example.corpaliv.ui.screens.PantallaDonaciones
-import com.example.corpaliv.ui.screens.InicioScreen
-import com.example.corpaliv.ui.screens.PantallaCatalogo
-import com.example.corpaliv.ui.screens.PantallaContacto
-import com.example.corpaliv.ui.screens.PantallaCuenta
-import com.example.corpaliv.ui.screens.PantallaDonaciones
-import com.example.corpaliv.ui.screens.PantallaPrograma
+import com.example.corpaliv.ui.screens.PantallaInicio
 import com.example.corpaliv.ui.screens.PantallaPrograma
 import kotlinx.coroutines.launch
 
@@ -99,7 +94,7 @@ fun AlbaApp() {
                 startDestination = Destino.INICIO.ruta,
                 modifier = Modifier.padding(innerPadding)
             ) {
-                composable(Destino.INICIO.ruta) { InicioScreen() }
+                composable(Destino.INICIO.ruta) { PantallaInicio(onIrA = { irA(it) }) }
                 composable(Destino.PROGRAMAS.ruta) { PantallaPrograma() }
                 composable(Destino.CATALOGO.ruta) { PantallaCatalogo() }
                 composable(Destino.DONACIONES.ruta) { PantallaDonaciones() }
