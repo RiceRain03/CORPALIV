@@ -11,6 +11,8 @@ import com.example.corpaliv.data.local.DonacionEntity
 import com.example.corpaliv.data.local.SesionDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.TimeZone
 
 class DonacionViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -53,6 +55,18 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
     var datosDeCuenta by mutableStateOf(false)
         private set
 
+    fun fechaMinimaUtc(): Long {
+        val hoyLocal = Calendar.getInstance()
+        val hoyUtc = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        hoyUtc.clear()
+        hoyUtc.set(
+            hoyLocal.get(Calendar.YEAR),
+            hoyLocal.get(Calendar.MONTH),
+            hoyLocal.get(Calendar.DAY_OF_MONTH)
+        )
+        return hoyUtc.timeInMillis
+    }
+
     fun actualizarMonto(valor: String) {
         if (valor.all { it.isDigit() } && valor.length <= 8) {
             monto = valor
@@ -92,7 +106,6 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
                     destino = destino,
                     esAnonima = esAnonima,
                     aceptaTerminos = aceptaTerminos,
-                    // Una donación anónima no se asocia a la cuenta
                     correoUsuario = if (esAnonima) null else correoSesion
                 )
             )
@@ -106,6 +119,7 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
     fun cerrarExito() {
         mostrarExito = false
     }
+
 
     private fun validar(): Boolean {
         limpiarErrores()
@@ -137,8 +151,12 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        if (fecha == null) {
+        val fechaElegida = fecha
+        if (fechaElegida == null) {
             errorFecha = "Selecciona una fecha"
+            valido = false
+        } else if (fechaElegida < fechaMinimaUtc()) {
+            errorFecha = "La fecha no puede ser anterior a hoy"
             valido = false
         }
 
