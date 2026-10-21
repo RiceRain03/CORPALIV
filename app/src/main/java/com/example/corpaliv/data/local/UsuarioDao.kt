@@ -11,4 +11,7 @@ interface UsuarioDao {
 
     @Query("SELECT * FROM usuarios WHERE correo = :correo LIMIT 1")
     suspend fun buscarPorCorreo(correo: String): UsuarioEntity?
+
+    @Query("UPDATE usuarios SET fotoRuta = :ruta WHERE id = :id")
+    suspend fun actualizarFoto(id: Int, ruta: String?)
 }

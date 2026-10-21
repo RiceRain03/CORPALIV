@@ -13,5 +13,6 @@ data class UsuarioEntity(
     val nombre: String,
     val correo: String,
     val claveHash: String,
-    val sal: String
+    val sal: String,
+    val fotoRuta: String? = null
 )
