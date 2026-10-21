@@ -7,7 +7,7 @@ import com.example.corpaliv.ui.components.PantallaBase
 @Composable
 fun PantallaCuenta(modifier: Modifier = Modifier) {
     PantallaBase(
-        titulo = "TITULO",
+        titulo = "Cuenta",
         descripcion = "Aqqui ira la cuenta en si ",
         modifier = modifier
     )
