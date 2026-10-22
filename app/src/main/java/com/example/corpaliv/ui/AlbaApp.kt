@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,6 +33,7 @@ import com.example.corpaliv.ui.screens.PantallaCuenta
 import com.example.corpaliv.ui.screens.PantallaDonaciones
 import com.example.corpaliv.ui.screens.PantallaInicio
 import com.example.corpaliv.ui.screens.PantallaPrograma
+import com.example.corpaliv.ui.viewmodel.CuentaViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +45,9 @@ fun AlbaApp() {
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    val cuentaViewModel: CuentaViewModel = viewModel()
+    val usuario = cuentaViewModel.usuarioActual
 
     fun irA(destino: Destino) {
         navController.navigate(destino.ruta) {
@@ -58,7 +63,9 @@ fun AlbaApp() {
         onDestinoSeleccionado = { destino ->
             scope.launch { drawerState.close() }
             irA(destino)
-        }
+        },
+        nombreUsuario = usuario?.nombre,
+        fotoRuta = usuario?.fotoRuta
     ) {
         Scaffold(
             topBar = {
@@ -99,7 +106,7 @@ fun AlbaApp() {
                 composable(Destino.CATALOGO.ruta) { PantallaCatalogo() }
                 composable(Destino.DONACIONES.ruta) { PantallaDonaciones() }
                 composable(Destino.CONTACTO.ruta) { PantallaContacto() }
-                composable(Destino.CUENTA.ruta) { PantallaCuenta() }
+                composable(Destino.CUENTA.ruta) { PantallaCuenta(viewModel = cuentaViewModel) }   // NUEVO (5D)
             }
         }
     }
