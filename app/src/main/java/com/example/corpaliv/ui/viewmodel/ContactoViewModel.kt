@@ -8,11 +8,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.corpaliv.data.local.AppDatabase
 import com.example.corpaliv.data.local.ContactoEntity
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ContactoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getDatabase(application).contactoDao()
+
+    val contactos: StateFlow<List<ContactoEntity>> = dao.obtenerContactos()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList(),
+        )
 
     var nombre by mutableStateOf("")
     var edad by mutableStateOf("")
@@ -38,7 +48,7 @@ class ContactoViewModel(application: Application) : AndroidViewModel(application
         }
 
         val edadInt = edad.toIntOrNull()
-        if (edadInt == null || edadInt <= 0) {
+        if ((edadInt == null) || (edadInt <= 0)) {
             errorEdad = "Ingrese una edad válida"
             esValido = false
         } else {
@@ -67,7 +77,7 @@ class ContactoViewModel(application: Application) : AndroidViewModel(application
                     fechaContacto = fecha,
                     esEmpresa = esEmpresa,
                     aceptaTerminos = aceptaTerminos,
-                    mensaje = mensaje
+                    mensaje = mensaje,
                 )
                 dao.insertarContacto(nuevoContacto)
                 esGuardadoExitoso = true

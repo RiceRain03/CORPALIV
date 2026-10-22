@@ -19,15 +19,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.corpaliv.ui.viewmodel.ContactoViewModel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaContacto(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
 
-    // Obtener la instancia de ContactoViewModel con el contexto de la app
     val viewModel: ContactoViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -36,6 +41,13 @@ fun PantallaContacto(
             }
         }
     )
+    val contactos by viewModel.contactos.collectAsState()
+    LaunchedEffect(viewModel.esGuardadoExitoso) {
+        if (viewModel.esGuardadoExitoso) {
+            delay(4.seconds)
+            viewModel.esGuardadoExitoso = false
+        }
+    }
 
     val scrollState = rememberScrollState()
 
@@ -51,7 +63,6 @@ fun PantallaContacto(
             style = MaterialTheme.typography.headlineSmall
         )
 
-        // 1. Campo Nombre (String)
         OutlinedTextField(
             value = viewModel.nombre,
             onValueChange = { viewModel.nombre = it },
@@ -67,14 +78,19 @@ fun PantallaContacto(
                 }
             },
             supportingText = {
-                viewModel.errorNombre?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
+                AnimatedVisibility(
+                    visible = viewModel.errorNombre != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    viewModel.errorNombre?.let {
+                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth()
         )
 
-        // 2. Campo Edad (Int)
         OutlinedTextField(
             value = viewModel.edad,
             onValueChange = { viewModel.edad = it },
@@ -143,7 +159,6 @@ fun PantallaContacto(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // 6. Checkbox (Términos)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -175,6 +190,43 @@ fun PantallaContacto(
         ) {
             Text("Enviar Registro")
         }
+        AnimatedVisibility(
+            visible = viewModel.esGuardadoExitoso,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Éxito",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "¡Registro guardado exitosamente en la base de datos local (Room)!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+        Text(
+            text = "Registros en Base de Datos Local (${contactos.size})",
+            style = MaterialTheme.typography.titleMedium
+        )
 
         // Diálogo de retroalimentación al guardar con éxito
         if (viewModel.esGuardadoExitoso) {
