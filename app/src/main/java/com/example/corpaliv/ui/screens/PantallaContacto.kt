@@ -26,6 +26,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun PantallaContacto(
@@ -78,13 +87,15 @@ fun PantallaContacto(
                 }
             },
             supportingText = {
-                AnimatedVisibility(
-                    visible = viewModel.errorNombre != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    viewModel.errorNombre?.let {
-                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                Column {
+                    AnimatedVisibility(
+                        visible = viewModel.errorNombre != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        viewModel.errorNombre?.let {
+                            Text(text = it, color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             },
@@ -114,30 +125,75 @@ fun PantallaContacto(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // 3. Campo Fecha (Date)
-        OutlinedTextField(
-            value = viewModel.fecha,
-            onValueChange = { viewModel.fecha = it },
-            label = { Text("Fecha de Contacto (DD/MM/AAAA)") },
-            isError = viewModel.errorFecha != null,
-            trailingIcon = {
-                if (viewModel.errorFecha != null) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = "Error",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            supportingText = {
-                viewModel.errorFecha?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
+        var mostrarDatePicker by remember { mutableStateOf(false) }
+        val datePickerState = rememberDatePickerState()
 
-        // 4. Switch (¿Es Empresa?)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = viewModel.fecha,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Fecha de Contacto") },
+                placeholder = { Text("Selecciona una fecha") },
+                trailingIcon = {
+                    IconButton(onClick = { mostrarDatePicker = true }) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Seleccionar fecha"
+                        )
+                    }
+                },
+                isError = viewModel.errorFecha != null,
+                supportingText = {
+                    Column {
+                        AnimatedVisibility(
+                            visible = viewModel.errorFecha != null,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            viewModel.errorFecha?.let {
+                                Text(text = it, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { mostrarDatePicker = true }
+            )
+        }
+
+        if (mostrarDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { mostrarDatePicker = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { millis ->
+                                val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                formatter.timeZone = TimeZone.getTimeZone("UTC")
+                                viewModel.fecha = formatter.format(Date(millis))
+                            }
+                            mostrarDatePicker = false
+                        }
+                    ) {
+                        Text("Aceptar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { mostrarDatePicker = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -150,7 +206,6 @@ fun PantallaContacto(
             )
         }
 
-        // 5. Mensaje adicional (String)
         OutlinedTextField(
             value = viewModel.mensaje,
             onValueChange = { viewModel.mensaje = it },
@@ -183,7 +238,6 @@ fun PantallaContacto(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Botón para enviar/validar y guardar en Room
         Button(
             onClick = { viewModel.validarYGuardar() },
             modifier = Modifier.fillMaxWidth()
@@ -228,7 +282,6 @@ fun PantallaContacto(
             style = MaterialTheme.typography.titleMedium
         )
 
-        // Diálogo de retroalimentación al guardar con éxito
         if (viewModel.esGuardadoExitoso) {
             AlertDialog(
                 onDismissRequest = { viewModel.esGuardadoExitoso = false },
