@@ -1,5 +1,9 @@
 package com.example.corpaliv.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -15,17 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 
 data class ItemCatalogo(
     val id: Int,
@@ -101,14 +94,6 @@ fun PantallaCatalogo(
 
     val categorias = listOf("Todos", "Educación", "Merchandising", "Artesanías")
 
-    val productosFiltrados = listaProductos.filter { item ->
-        val coincideBusqueda = item.titulo.contains(textoBusqueda, ignoreCase = true) ||
-                item.descripcion.contains(textoBusqueda, ignoreCase = true)
-        val coincideCategoria =
-            categoriaSeleccionada == "Todos" || item.categoria == categoriaSeleccionada
-        coincideBusqueda && coincideCategoria
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -122,7 +107,6 @@ fun PantallaCatalogo(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 1. Campo de Búsqueda
         OutlinedTextField(
             value = textoBusqueda,
             onValueChange = { textoBusqueda = it },
@@ -146,7 +130,7 @@ fun PantallaCatalogo(
                 label = { Text("Filtrar por Categoría") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuCategoriasExpandido) },
                 modifier = Modifier
-                    .menuAnchor()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     .fillMaxWidth()
             )
 
@@ -173,6 +157,16 @@ fun PantallaCatalogo(
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = "TransicionCatalogo"
         ) { categoria ->
+            val productosFiltrados = remember(textoBusqueda, categoria) {
+                listaProductos.filter { item ->
+                    val coincideBusqueda = item.titulo.contains(textoBusqueda, ignoreCase = true) ||
+                            item.descripcion.contains(textoBusqueda, ignoreCase = true)
+                    val coincideCategoria =
+                        categoria == "Todos" || item.categoria == categoria
+                    coincideBusqueda && coincideCategoria
+                }
+            }
+
             if (productosFiltrados.isEmpty()) {
                 Box(
                     modifier = Modifier
