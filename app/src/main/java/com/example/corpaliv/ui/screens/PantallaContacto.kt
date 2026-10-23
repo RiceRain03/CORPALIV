@@ -222,7 +222,7 @@ fun PantallaContacto(
                 onCheckedChange = { viewModel.aceptaTerminos = it }
             )
             Text(
-                text = "Acepto los términos de tratamiento de datos ficticios",
+                text = "Acepto los términos de tratamiento de datos",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
