@@ -6,7 +6,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -244,59 +243,107 @@ fun PantallaContacto(
         ) {
             Text("Enviar Registro")
         }
-        AnimatedVisibility(
-            visible = viewModel.esGuardadoExitoso,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
+        if (!viewModel.esAdminAutenticado) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Row(
+                Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Éxito",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
                     Text(
-                        text = "¡Registro guardado exitosamente en la base de datos local (Room)!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        text = "Los registros de contacto son confidenciales y solo accesibles por administradores.",
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.mostrarDialogoAdmin = true }) {
+                        Text("Ingresar como Administrador")
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Registros en Base de Datos (${contactos.size})",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                TextButton(onClick = { viewModel.cerrarSesionAdmin() }) {
+                    Text("Cerrar Sesión")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (contactos.isEmpty()) {
+                Text(
+                    text = "No hay registros guardados aún.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            } else {
+                contactos.forEach { item ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = "Nombre: ${item.nombre}", style = MaterialTheme.typography.titleSmall)
+                            Text(text = "Edad: ${item.edad} | Fecha: ${item.fechaContacto}")
+                            Text(text = "Empresa: ${if (item.esEmpresa) "Sí" else "No"}")
+                            if (item.mensaje.isNotBlank()) {
+                                Text(text = "Mensaje: ${item.mensaje}")
+                            }
+                        }
+                    }
                 }
             }
         }
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-        Text(
-            text = "Registros en Base de Datos Local (${contactos.size})",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        if (viewModel.esGuardadoExitoso) {
+        if (viewModel.mostrarDialogoAdmin) {
             AlertDialog(
-                onDismissRequest = { viewModel.esGuardadoExitoso = false },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                onDismissRequest = {
+                    viewModel.mostrarDialogoAdmin = false
+                    viewModel.errorClaveAdmin = null
+                    viewModel.claveAdmin = ""
                 },
-                title = { Text("¡Guardado exitoso!") },
-                text = { Text("Los datos se han guardado correctamente en la base de datos local (Room).") },
+                title = { Text("Acceso Administrador") },
+                text = {
+                    Column {
+                        Text("Ingrese la clave para desbloquear los datos guardados:")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = viewModel.claveAdmin,
+                            onValueChange = { viewModel.claveAdmin = it },
+                            label = { Text("Contraseña (admin123)") },
+                            singleLine = true,
+                            isError = viewModel.errorClaveAdmin != null,
+                            supportingText = {
+                                viewModel.errorClaveAdmin?.let {
+                                    Text(text = it, color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        )
+                    }
+                },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.esGuardadoExitoso = false }) {
-                        Text("Aceptar")
+                    Button(onClick = { viewModel.validarClaveAdmin() }) {
+                        Text("Ingresar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        viewModel.mostrarDialogoAdmin = false
+                        viewModel.errorClaveAdmin = null
+                        viewModel.claveAdmin = ""
+                    }) {
+                        Text("Cancelar")
                     }
                 }
             )

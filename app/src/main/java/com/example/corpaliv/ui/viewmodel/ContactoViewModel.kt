@@ -94,4 +94,24 @@ class ContactoViewModel(application: Application) : AndroidViewModel(application
         aceptaTerminos = false
         mensaje = ""
     }
+
+    var esAdminAutenticado by mutableStateOf(false)
+    var mostrarDialogoAdmin by mutableStateOf(false)
+    var claveAdmin by mutableStateOf("")
+    var errorClaveAdmin by mutableStateOf<String?>(null)
+
+    fun validarClaveAdmin() {
+        if (claveAdmin == "admin123") {
+            esAdminAutenticado = true
+            mostrarDialogoAdmin = false
+            errorClaveAdmin = null
+            claveAdmin = ""
+        } else {
+            errorClaveAdmin = "Contraseña incorrecta"
+        }
+    }
+
+    fun cerrarSesionAdmin() {
+        esAdminAutenticado = false
+    }
 }
