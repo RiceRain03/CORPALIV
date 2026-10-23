@@ -106,7 +106,7 @@ fun AlbaApp() {
                 composable(Destino.CATALOGO.ruta) { PantallaCatalogo() }
                 composable(Destino.DONACIONES.ruta) { PantallaDonaciones() }
                 composable(Destino.CONTACTO.ruta) { PantallaContacto() }
-                composable(Destino.CUENTA.ruta) { PantallaCuenta(viewModel = cuentaViewModel) }   // NUEVO (5D)
+                composable(Destino.CUENTA.ruta) { PantallaCuenta(viewModel = cuentaViewModel) }
             }
         }
     }

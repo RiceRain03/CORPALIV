@@ -1,5 +1,8 @@
 package com.example.corpaliv.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -47,9 +50,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.corpaliv.Notificador
 import com.example.corpaliv.ui.viewmodel.DonacionViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -68,8 +73,26 @@ fun PantallaDonaciones(
     modifier: Modifier = Modifier,
     viewModel: DonacionViewModel = viewModel()
 ) {
+    val contexto = LocalContext.current
     var mostrarCalendario by remember { mutableStateOf(false) }
     var destinoExpandido by remember { mutableStateOf(false) }
+
+
+    val permisoNotificacionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        viewModel.guardar()
+    }
+
+    fun registrarDonacion() {
+        if (!viewModel.formularioValido()) return
+
+        if (Notificador.tienePermiso(contexto)) {
+            viewModel.guardar()
+        } else {
+            permisoNotificacionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.autorrellenar()
@@ -87,8 +110,7 @@ fun PantallaDonaciones(
             style = MaterialTheme.typography.headlineSmall
         )
         Text(
-            text = "Este formulario registra tu intención de donar. " +
-                    "No se realiza ningún pago. ",
+            text = "Este formulario registra tu intención de donar. " ,
             style = MaterialTheme.typography.bodySmall
         )
 
@@ -108,6 +130,7 @@ fun PantallaDonaciones(
             }
         }
 
+
         AnimatedVisibility(
             visible = !viewModel.esAnonima,
             enter = fadeIn() + expandVertically(),
@@ -125,6 +148,7 @@ fun PantallaDonaciones(
             )
         }
 
+
         OutlinedTextField(
             value = viewModel.monto,
             onValueChange = { viewModel.actualizarMonto(it) },
@@ -137,7 +161,6 @@ fun PantallaDonaciones(
             supportingText = { Text(viewModel.errorMonto ?: "Entre \$1.000 y \$1.000.000") },
             modifier = Modifier.fillMaxWidth()
         )
-
 
         Box {
             OutlinedTextField(
@@ -157,12 +180,14 @@ fun PantallaDonaciones(
                 supportingText = { viewModel.errorFecha?.let { Text(it) } },
                 modifier = Modifier.fillMaxWidth()
             )
+
             Box(
                 modifier = Modifier
                     .matchParentSize()
                     .clickable { mostrarCalendario = true }
             )
         }
+
 
         ExposedDropdownMenuBox(
             expanded = destinoExpandido,
@@ -210,6 +235,7 @@ fun PantallaDonaciones(
             )
         }
 
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked = viewModel.aceptaTerminos,
@@ -230,7 +256,7 @@ fun PantallaDonaciones(
         }
 
         Button(
-            onClick = { viewModel.guardar() },
+            onClick = { registrarDonacion() },
             enabled = !viewModel.guardando,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -245,9 +271,11 @@ fun PantallaDonaciones(
         }
     }
 
+
     if (mostrarCalendario) {
         val estadoCalendario = rememberDatePickerState(
             initialSelectedDateMillis = viewModel.fecha,
+
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                     return utcTimeMillis >= viewModel.fechaMinimaUtc()
@@ -288,7 +316,7 @@ fun PantallaDonaciones(
             },
             title = { Text("¡Gracias por tu aporte!") },
             text = {
-                Text("Tu Donacion se realizo con exito!")
+                Text("Tu intención de donar quedó registrada. ")
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.cerrarExito() }) {

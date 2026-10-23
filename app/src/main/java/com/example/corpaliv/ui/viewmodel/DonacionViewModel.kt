@@ -6,12 +6,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.corpaliv.Notificador
 import com.example.corpaliv.data.local.AppDatabase
 import com.example.corpaliv.data.local.DonacionEntity
 import com.example.corpaliv.data.local.SesionDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
 import java.util.Calendar
+import java.util.Locale
 import java.util.TimeZone
 
 class DonacionViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,6 +94,8 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun formularioValido(): Boolean = validar()
+
     fun guardar() {
         if (!validar()) return
 
@@ -98,16 +103,28 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
             val fechaElegida = fecha ?: return@launch
             guardando = true
 
+            val montoDonado = monto.toInt()
+            val destinoElegido = destino
+
             donacionDao.insertar(
                 DonacionEntity(
                     nombre = if (esAnonima) "Anónimo" else nombre.trim(),
-                    monto = monto.toInt(),
+                    monto = montoDonado,
                     fecha = fechaElegida,
-                    destino = destino,
+                    destino = destinoElegido,
                     esAnonima = esAnonima,
                     aceptaTerminos = aceptaTerminos,
                     correoUsuario = if (esAnonima) null else correoSesion
                 )
+            )
+
+            val montoTexto = NumberFormat
+                .getIntegerInstance(Locale.Builder().setLanguage("es").setRegion("CL").build())
+                .format(montoDonado)
+            Notificador.mostrarDonacion(
+                context = getApplication(),
+                titulo = "¡Gracias por tu aporte!",
+                mensaje = "Registramos tu intención de donar \$$montoTexto para: $destinoElegido."
             )
 
             limpiarFormulario()

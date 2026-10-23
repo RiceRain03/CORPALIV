@@ -1,6 +1,7 @@
 package com.example.corpaliv.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -20,7 +21,7 @@ enum class Destino(
     CATALOGO("catalogo", "Catálogo", Icons.Filled.ShoppingCart, true),
     CONTACTO("contacto", "Contacto", Icons.Filled.Email, true),
     CUENTA("cuenta", "Mi cuenta", Icons.Filled.Person, true),
-    DONACIONES("donaciones", "Donaciones", Icons.Filled.Favorite, true);
+    DONACIONES("donaciones", "Donaciones", Icons.Filled.AccountBalanceWallet, true);
 
     companion object {
         fun desdeRuta(ruta: String?): Destino =
