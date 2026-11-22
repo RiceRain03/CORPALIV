@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import com.example.corpaliv.ui.components.EquivalenteDolar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
@@ -161,6 +162,9 @@ fun PantallaDonaciones(
             supportingText = { Text(viewModel.errorMonto ?: "Entre \$1.000 y \$1.000.000") },
             modifier = Modifier.fillMaxWidth()
         )
+             EquivalenteDolar(monto = viewModel.monto)
+
+        
 
         Box {
             OutlinedTextField(
