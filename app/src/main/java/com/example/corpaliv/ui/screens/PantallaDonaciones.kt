@@ -61,6 +61,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedButton
+import com.example.corpaliv.data.remote.DonacionDto
 
 private fun formatearFechaDonacion(milisegundos: Long): String {
     val formato = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -273,8 +278,16 @@ fun PantallaDonaciones(
                 Text("Registrar donación")
             }
         }
-    }
 
+        viewModel.errorServidor?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        SeccionMisDonaciones(viewModel)
+    }
 
     if (mostrarCalendario) {
         val estadoCalendario = rememberDatePickerState(
@@ -338,6 +351,145 @@ private fun IconoCampoError(visible: Boolean) {
             imageVector = Icons.Filled.Warning,
             contentDescription = "Error",
             tint = MaterialTheme.colorScheme.error
+        )
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SeccionMisDonaciones(viewModel: DonacionViewModel) {
+    var aEditar by remember { mutableStateOf<DonacionDto?>(null) }
+    var aEliminar by remember { mutableStateOf<DonacionDto?>(null) }
+    var montoEditado by remember { mutableStateOf("") }
+    var destinoEditado by remember { mutableStateOf("") }
+    var destinoExpandido by remember { mutableStateOf(false) }
+
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Mis donaciones (${viewModel.misDonaciones.size})",
+            style = MaterialTheme.typography.titleMedium
+        )
+        TextButton(onClick = { viewModel.cargarMisDonaciones() }) {
+            Text("Actualizar")
+        }
+    }
+
+    if (!viewModel.datosDeCuenta) {
+        Text(
+            text = "Inicia sesión en «Mi cuenta» para ver y administrar tus donaciones.",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+    if (viewModel.cargandoLista) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+    }
+    viewModel.errorLista?.let {
+        Text(
+            text = it,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+
+    viewModel.misDonaciones.forEach { d ->
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "\$${d.monto} → ${d.destino}",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = "Fecha: ${formatearFechaDonacion(d.fecha)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row {
+                    TextButton(onClick = {
+                        aEditar = d
+                        montoEditado = d.monto.toString()
+                        destinoEditado = d.destino
+                    }) { Text("Editar") }
+                    TextButton(onClick = { aEliminar = d }) { Text("Eliminar") }
+                }
+            }
+        }
+    }
+
+    aEditar?.let { donacion ->
+        AlertDialog(
+            onDismissRequest = { aEditar = null },
+            title = { Text("Editar donación") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = montoEditado,
+                        onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 8) montoEditado = it },
+                        label = { Text("Monto") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = destinoExpandido,
+                        onExpandedChange = { destinoExpandido = it }
+                    ) {
+                        OutlinedTextField(
+                            value = destinoEditado,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Destino") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido)
+                            },
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = destinoExpandido,
+                            onDismissRequest = { destinoExpandido = false }
+                        ) {
+                            viewModel.destinos.forEach { opcion ->
+                                DropdownMenuItem(
+                                    text = { Text(opcion) },
+                                    onClick = {
+                                        destinoEditado = opcion
+                                        destinoExpandido = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.guardarEdicion(donacion, montoEditado, destinoEditado) { aEditar = null }
+                }) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { aEditar = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    aEliminar?.let { donacion ->
+        AlertDialog(
+            onDismissRequest = { aEliminar = null },
+            title = { Text("Eliminar donación") },
+            text = { Text("¿Eliminar tu donación de \$${donacion.monto}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.eliminarDonacion(donacion.id)
+                    aEliminar = null
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { aEliminar = null }) { Text("Cancelar") }
+            }
         )
     }
 }
