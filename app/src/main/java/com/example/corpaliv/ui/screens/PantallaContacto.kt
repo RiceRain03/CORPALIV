@@ -34,7 +34,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.foundation.horizontalScroll
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaContacto(
     modifier: Modifier = Modifier,
@@ -49,7 +51,8 @@ fun PantallaContacto(
             }
         }
     )
-    val contactos by viewModel.contactos.collectAsState()
+    val contactos = viewModel.contactosRemotos
+    LaunchedEffect(Unit) { viewModel.refrescarAdmin() }
     LaunchedEffect(viewModel.esGuardadoExitoso) {
         if (viewModel.esGuardadoExitoso) {
             delay(4.seconds)
@@ -212,6 +215,21 @@ fun PantallaContacto(
             maxLines = 4,
             modifier = Modifier.fillMaxWidth()
         )
+        Text("Tipo de colaboración", style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ContactoViewModel.TIPOS.forEach { tipo ->
+                FilterChip(
+                    selected = viewModel.tipoColaboracion == tipo,
+                    onClick = { viewModel.tipoColaboracion = tipo },
+                    label = { Text(tipo.replace("_", " ")) }
+                )
+            }
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -237,11 +255,20 @@ fun PantallaContacto(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        viewModel.errorServidor?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
         Button(
             onClick = { viewModel.validarYGuardar() },
+            enabled = !viewModel.enviando,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Enviar Registro")
+            Text(if (viewModel.enviando) "Enviando..." else "Enviar Registro")
         }
         if (!viewModel.esAdminAutenticado) {
             Card(
@@ -253,12 +280,17 @@ fun PantallaContacto(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Los registros de contacto son confidenciales y solo accesibles por administradores.",
+                        text = "Las solicitudes son confidenciales y solo las ve el equipo de vinculación (rol ADMIN).",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { viewModel.mostrarDialogoAdmin = true }) {
-                        Text("Ingresar como Administrador")
+                    Text(
+                        text = "Inicia sesión con una cuenta de gestor en «Mi cuenta» y vuelve aquí.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = { viewModel.refrescarAdmin() }) {
+                        Text("Ya inicié sesión, verificar")
                     }
                 }
             }
@@ -269,24 +301,37 @@ fun PantallaContacto(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Registros en Base de Datos (${contactos.size})",
+                    text = "Solicitudes recibidas (${contactos.size})",
                     style = MaterialTheme.typography.titleMedium
                 )
-                TextButton(onClick = { viewModel.cerrarSesionAdmin() }) {
-                    Text("Cerrar Sesión")
+                TextButton(onClick = { viewModel.cargarContactos() }) {
+                    Text("Actualizar")
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (contactos.isEmpty()) {
+            if (viewModel.cargandoLista) {
+                CircularProgressIndicator()
+            }
+            viewModel.errorLista?.let {
                 Text(
-                    text = "No hay registros guardados aún.",
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (contactos.isEmpty() && !viewModel.cargandoLista) {
+                Text(
+                    text = "No hay solicitudes aún.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
-            } else {
-                contactos.forEach { item ->
+            }
+
+            contactos.forEach { item ->
+                key(item.id) {
+                    var menuEstado by remember { mutableStateOf(false) }
+                    var confirmarEliminar by remember { mutableStateOf(false) }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -294,59 +339,62 @@ fun PantallaContacto(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = "Nombre: ${item.nombre}", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                text = "${item.nombre} · ${(item.tipoColaboracion ?: "OTRO").replace("_", " ")}",
+                                style = MaterialTheme.typography.titleSmall
+                            )
                             Text(text = "Edad: ${item.edad} | Fecha: ${item.fechaContacto}")
                             Text(text = "Empresa: ${if (item.esEmpresa) "Sí" else "No"}")
-                            if (item.mensaje.isNotBlank()) {
+                            if (!item.mensaje.isNullOrBlank()) {
                                 Text(text = "Mensaje: ${item.mensaje}")
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box {
+                                    OutlinedButton(onClick = { menuEstado = true }) {
+                                        Text("Estado: ${item.estado ?: "RECIBIDA"}")
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuEstado,
+                                        onDismissRequest = { menuEstado = false }
+                                    ) {
+                                        ContactoViewModel.ESTADOS.forEach { estado ->
+                                            DropdownMenuItem(
+                                                text = { Text(estado) },
+                                                onClick = {
+                                                    menuEstado = false
+                                                    item.id?.let { viewModel.cambiarEstado(it, estado) }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                TextButton(onClick = { confirmarEliminar = true }) {
+                                    Text("Eliminar")
+                                }
                             }
                         }
                     }
-                }
-            }
-        }
 
-        if (viewModel.mostrarDialogoAdmin) {
-            AlertDialog(
-                onDismissRequest = {
-                    viewModel.mostrarDialogoAdmin = false
-                    viewModel.errorClaveAdmin = null
-                    viewModel.claveAdmin = ""
-                },
-                title = { Text("Acceso Administrador") },
-                text = {
-                    Column {
-                        Text("Ingrese la clave para desbloquear los datos guardados:")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = viewModel.claveAdmin,
-                            onValueChange = { viewModel.claveAdmin = it },
-                            label = { Text("Contraseña (admin123)") },
-                            singleLine = true,
-                            isError = viewModel.errorClaveAdmin != null,
-                            supportingText = {
-                                viewModel.errorClaveAdmin?.let {
-                                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                                }
+                    if (confirmarEliminar) {
+                        AlertDialog(
+                            onDismissRequest = { confirmarEliminar = false },
+                            title = { Text("Eliminar solicitud") },
+                            text = { Text("¿Eliminar la solicitud de ${item.nombre}? Esta acción no se puede deshacer.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    confirmarEliminar = false
+                                    item.id?.let { viewModel.eliminar(it) }
+                                }) { Text("Eliminar") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { confirmarEliminar = false }) { Text("Cancelar") }
                             }
                         )
                     }
-                },
-                confirmButton = {
-                    Button(onClick = { viewModel.validarClaveAdmin() }) {
-                        Text("Ingresar")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        viewModel.mostrarDialogoAdmin = false
-                        viewModel.errorClaveAdmin = null
-                        viewModel.claveAdmin = ""
-                    }) {
-                        Text("Cancelar")
-                    }
                 }
-            )
+            }
         }
     }
 }
