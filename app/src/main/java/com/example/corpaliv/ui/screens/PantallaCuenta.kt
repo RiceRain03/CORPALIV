@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.corpaliv.data.local.FotoPerfil
 import com.example.corpaliv.ui.components.FotoPerfilCircular
 import com.example.corpaliv.ui.viewmodel.CuentaViewModel
+import androidx.compose.material3.AlertDialog
 
 @Composable
 fun PantallaCuenta(
@@ -127,7 +128,9 @@ fun PantallaCuenta(
                 onTomarFoto = { tomarFoto() },
                 onElegirGaleria = { galeriaLauncher.launch("image/*") },
                 onCerrarSesion = { viewModel.cerrarSesion() }
+
             )
+                GestionPerfil(viewModel)
         } else {
             FormularioCuenta(viewModel)
         }
@@ -333,6 +336,63 @@ private fun IconoError(visible: Boolean) {
             imageVector = Icons.Filled.Warning,
             contentDescription = "Error",
             tint = MaterialTheme.colorScheme.error
+        )
+    }
+}
+
+@Composable
+private fun GestionPerfil(viewModel: CuentaViewModel) {
+    val usuario = viewModel.usuarioActual ?: return
+    var nombreEditado by remember(usuario.nombre) { mutableStateOf(usuario.nombre) }
+    var confirmarEliminar by remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Editar perfil", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = nombreEditado,
+                onValueChange = { nombreEditado = it },
+                label = { Text("Nombre") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            viewModel.errorPerfil?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Button(
+                onClick = { viewModel.guardarNombre(nombreEditado) },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Guardar nombre") }
+            OutlinedButton(
+                onClick = { confirmarEliminar = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Eliminar mi cuenta") }
+        }
+    }
+
+    if (confirmarEliminar) {
+        AlertDialog(
+            onDismissRequest = { confirmarEliminar = false },
+            title = { Text("Eliminar cuenta") },
+            text = { Text("Se eliminará tu cuenta del servidor. Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmarEliminar = false
+                    viewModel.eliminarCuenta()
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarEliminar = false }) { Text("Cancelar") }
+            }
         )
     }
 }
