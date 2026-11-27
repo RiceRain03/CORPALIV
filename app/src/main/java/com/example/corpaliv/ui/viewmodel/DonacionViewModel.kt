@@ -2,6 +2,7 @@ package com.example.corpaliv.ui.viewmodel
 
 import android.app.Application
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -10,6 +11,9 @@ import com.example.corpaliv.Notificador
 import com.example.corpaliv.data.local.AppDatabase
 import com.example.corpaliv.data.local.DonacionEntity
 import com.example.corpaliv.data.local.SesionDataStore
+import com.example.corpaliv.data.remote.DonacionDto
+import com.example.corpaliv.data.repository.DonacionRemotaRepository
+import com.example.corpaliv.data.repository.mensajeAmigable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -28,6 +32,7 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
     private val donacionDao = baseDatos.donacionDao()
     private val usuarioDao = baseDatos.usuarioDao()
     private val sesion = SesionDataStore(application)
+    private val remoto = DonacionRemotaRepository()
 
     val destinos = listOf(
         "Escuela Especial Jan Van Dijk",
@@ -35,6 +40,7 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
         "Donde más se necesite"
     )
 
+    // Formulario
     var nombre by mutableStateOf("")
     var monto by mutableStateOf("")
         private set
@@ -52,6 +58,12 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
     var guardando by mutableStateOf(false)
         private set
     var mostrarExito by mutableStateOf(false)
+        private set
+
+    val misDonaciones = mutableStateListOf<DonacionDto>()
+    var errorServidor by mutableStateOf<String?>(null)
+    var errorLista by mutableStateOf<String?>(null)
+    var cargandoLista by mutableStateOf(false)
         private set
 
     private var correoSesion: String? = null
@@ -78,6 +90,7 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
 
     fun autorrellenar() {
         viewModelScope.launch {
+            sesion.restaurarToken()
             val correoGuardado = sesion.correoActual.first()
             val usuario = if (correoGuardado != null) {
                 usuarioDao.buscarPorCorreo(correoGuardado)
@@ -91,6 +104,7 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
             if (usuario != null && nombre.isBlank()) {
                 nombre = usuario.nombre
             }
+            cargarMisDonaciones()
         }
     }
 
@@ -102,19 +116,37 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val fechaElegida = fecha ?: return@launch
             guardando = true
+            errorServidor = null
 
             val montoDonado = monto.toInt()
             val destinoElegido = destino
 
+            val dto = DonacionDto(
+                nombre = if (esAnonima) "Anónimo" else nombre.trim(),
+                monto = montoDonado,
+                fecha = fechaElegida,
+                destino = destinoElegido,
+                esAnonima = esAnonima,
+                aceptaTerminos = aceptaTerminos,
+                correoUsuario = if (esAnonima) null else correoSesion
+            )
+
+            val resultado = remoto.crear(dto)
+            if (resultado.isFailure) {
+                errorServidor = resultado.exceptionOrNull()?.mensajeAmigable()
+                guardando = false
+                return@launch
+            }
+
             donacionDao.insertar(
                 DonacionEntity(
-                    nombre = if (esAnonima) "Anónimo" else nombre.trim(),
-                    monto = montoDonado,
-                    fecha = fechaElegida,
-                    destino = destinoElegido,
-                    esAnonima = esAnonima,
-                    aceptaTerminos = aceptaTerminos,
-                    correoUsuario = if (esAnonima) null else correoSesion
+                    nombre = dto.nombre,
+                    monto = dto.monto,
+                    fecha = dto.fecha,
+                    destino = dto.destino,
+                    esAnonima = dto.esAnonima,
+                    aceptaTerminos = dto.aceptaTerminos,
+                    correoUsuario = dto.correoUsuario
                 )
             )
 
@@ -135,6 +167,58 @@ class DonacionViewModel(application: Application) : AndroidViewModel(application
 
     fun cerrarExito() {
         mostrarExito = false
+    }
+
+
+    fun cargarMisDonaciones() {
+        val correo = correoSesion
+        if (correo == null) {
+            misDonaciones.clear()
+            return
+        }
+        viewModelScope.launch {
+            cargandoLista = true
+            errorLista = null
+            remoto.listarPorUsuario(correo)
+                .onSuccess {
+                    misDonaciones.clear()
+                    misDonaciones.addAll(it)
+                }
+                .onFailure { errorLista = it.mensajeAmigable() }
+            cargandoLista = false
+        }
+    }
+
+    fun eliminarDonacion(id: Long?) {
+        if (id == null) return
+        viewModelScope.launch {
+            remoto.eliminar(id)
+                .onSuccess { cargarMisDonaciones() }
+                .onFailure { errorLista = it.mensajeAmigable() }
+        }
+    }
+
+    fun guardarEdicion(
+        original: DonacionDto,
+        nuevoMonto: String,
+        nuevoDestino: String,
+        alTerminar: () -> Unit
+    ) {
+        val id = original.id ?: return
+        val montoNumero = nuevoMonto.toIntOrNull()
+        if (montoNumero == null || montoNumero < MONTO_MINIMO || montoNumero > MONTO_MAXIMO) {
+            errorLista = "El monto debe estar entre \$1.000 y \$1.000.000"
+            return
+        }
+        viewModelScope.launch {
+            remoto.actualizar(id, original.copy(monto = montoNumero, destino = nuevoDestino))
+                .onSuccess {
+                    errorLista = null
+                    cargarMisDonaciones()
+                    alTerminar()
+                }
+                .onFailure { errorLista = it.mensajeAmigable() }
+        }
     }
 
 
