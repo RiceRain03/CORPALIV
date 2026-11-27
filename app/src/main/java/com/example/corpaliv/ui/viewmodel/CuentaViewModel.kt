@@ -17,11 +17,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.corpaliv.data.repository.AuthRepository
+import com.example.corpaliv.data.repository.UsuarioRemotoRepository
+import com.example.corpaliv.data.repository.mensajeAmigable
 
 class CuentaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getDatabase(application).usuarioDao()
     private val sesion = SesionDataStore(application)
+    private val auth = AuthRepository()
+    private val usuariosRemoto = UsuarioRemotoRepository()
+    private var idRemoto: Long? = null
+
+    var errorPerfil by mutableStateOf<String?>(null)
 
     var esRegistro by mutableStateOf(false)
         private set
@@ -53,6 +61,8 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun restaurarSesion() {
         viewModelScope.launch {
+            sesion.restaurarToken()
+            idRemoto = sesion.idRemoto.first()
             val correoGuardado = sesion.correoActual.first()
             if (correoGuardado != null) {
                 usuarioActual = dao.buscarPorCorreo(correoGuardado)
@@ -74,27 +84,35 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
             cargando = true
             val correoLimpio = correo.trim().lowercase()
 
-            if (dao.buscarPorCorreo(correoLimpio) != null) {
-                errorCorreo = "Este correo ya está registrado"
-                cargando = false
-                return@launch
-            }
+            auth.registrar(nombre.trim(), correoLimpio, clave)
+                .onSuccess { r ->
+                    sesion.guardarCredenciales(r.token, r.rol, r.id)
+                    idRemoto = r.id
 
-            val sal = ClaveSegura.generarSal()
-            val hash = withContext(Dispatchers.Default) { ClaveSegura.cifrar(clave, sal) }
-
-            dao.insertar(
-                UsuarioEntity(
-                    nombre = nombre.trim(),
-                    correo = correoLimpio,
-                    claveHash = hash,
-                    sal = sal
-                )
-            )
-
-            usuarioActual = dao.buscarPorCorreo(correoLimpio)
-            sesion.guardarSesion(correoLimpio)
-            limpiarCampos()
+                    if (dao.buscarPorCorreo(correoLimpio) == null) {
+                        val sal = ClaveSegura.generarSal()
+                        val hash = withContext(Dispatchers.Default) { ClaveSegura.cifrar(clave, sal) }
+                        dao.insertar(
+                            UsuarioEntity(
+                                nombre = r.nombre,
+                                correo = r.correo,
+                                claveHash = hash,
+                                sal = sal
+                            )
+                        )
+                    }
+                    usuarioActual = dao.buscarPorCorreo(correoLimpio)
+                    sesion.guardarSesion(correoLimpio)
+                    limpiarCampos()
+                }
+                .onFailure { e ->
+                    val mensaje = e.mensajeAmigable()
+                    if (mensaje.contains("correo", ignoreCase = true)) {
+                        errorCorreo = mensaje
+                    } else {
+                        errorGeneral = mensaje
+                    }
+                }
             cargando = false
         }
     }
@@ -104,27 +122,84 @@ class CuentaViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             cargando = true
-            val usuario = dao.buscarPorCorreo(correo.trim().lowercase())
+            val correoLimpio = correo.trim().lowercase()
 
-            val claveCorrecta = usuario != null && withContext(Dispatchers.Default) {
-                ClaveSegura.verificar(clave, usuario.sal, usuario.claveHash)
-            }
+            auth.login(correoLimpio, clave)
+                .onSuccess { r ->
+                    sesion.guardarCredenciales(r.token, r.rol, r.id)
+                    idRemoto = r.id
 
-            if (claveCorrecta) {
-                usuarioActual = usuario
-                sesion.guardarSesion(usuario!!.correo)
-                limpiarCampos()
-            } else {
-                errorGeneral = "Correo o clave incorrectos"
-            }
+                    var local = dao.buscarPorCorreo(correoLimpio)
+                    if (local == null) {
+                        val sal = ClaveSegura.generarSal()
+                        val hash = withContext(Dispatchers.Default) { ClaveSegura.cifrar(clave, sal) }
+                        dao.insertar(
+                            UsuarioEntity(
+                                nombre = r.nombre,
+                                correo = r.correo,
+                                claveHash = hash,
+                                sal = sal
+                            )
+                        )
+                        local = dao.buscarPorCorreo(correoLimpio)
+                    }
+                    usuarioActual = local
+                    sesion.guardarSesion(correoLimpio)
+                    limpiarCampos()
+                }
+                .onFailure { errorGeneral = it.mensajeAmigable() }
             cargando = false
         }
     }
 
+
     fun cerrarSesion() {
+        auth.cerrarSesion()
+        idRemoto = null
         usuarioActual = null
+        errorPerfil = null
         limpiarCampos()
         viewModelScope.launch { sesion.cerrarSesion() }
+    }
+
+    fun guardarNombre(nuevoNombre: String) {
+        val usuario = usuarioActual ?: return
+        val id = idRemoto
+        if (id == null) {
+            errorPerfil = "Vuelve a iniciar sesión para editar tu perfil."
+            return
+        }
+        if (nuevoNombre.trim().length < 3) {
+            errorPerfil = "El nombre debe tener al menos 3 caracteres"
+            return
+        }
+        viewModelScope.launch {
+            usuariosRemoto.actualizarNombre(id, nuevoNombre.trim(), usuario.correo)
+                .onSuccess {
+                    dao.actualizarNombre(usuario.id, nuevoNombre.trim())
+                    usuarioActual = usuario.copy(nombre = nuevoNombre.trim())
+                    errorPerfil = null
+                }
+                .onFailure { errorPerfil = it.mensajeAmigable() }
+        }
+    }
+
+    fun eliminarCuenta() {
+        val usuario = usuarioActual ?: return
+        val id = idRemoto
+        if (id == null) {
+            errorPerfil = "Vuelve a iniciar sesión para eliminar tu cuenta."
+            return
+        }
+        viewModelScope.launch {
+            usuariosRemoto.eliminar(id)
+                .onSuccess {
+                    FotoPerfil.borrar(usuario.fotoRuta)
+                    dao.eliminar(usuario.id)
+                    cerrarSesion()
+                }
+                .onFailure { errorPerfil = it.mensajeAmigable() }
+        }
     }
 
 

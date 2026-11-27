@@ -14,4 +14,10 @@ interface UsuarioDao {
 
     @Query("UPDATE usuarios SET fotoRuta = :ruta WHERE id = :id")
     suspend fun actualizarFoto(id: Int, ruta: String?)
+
+    @Query("UPDATE usuarios SET nombre = :nombre WHERE id = :id")
+    suspend fun actualizarNombre(id: Int, nombre: String)
+
+    @Query("DELETE FROM usuarios WHERE id = :id")
+    suspend fun eliminar(id: Int)
 }
